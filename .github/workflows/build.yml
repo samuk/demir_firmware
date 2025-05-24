@@ -1,0 +1,152 @@
+name: Build DEMIR Firmware
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        board: [uno]
+        
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v2
+
+    - name: Install Arduino platforms
+      run: |
+        arduino-cli core update-index
+        arduino-cli core install arduino:avr
+
+    - name: Verify Arduino CLI installation
+      run: |
+        arduino-cli version
+        arduino-cli core list
+
+    - name: Create Arduino sketch structure
+      run: |
+        # Arduino CLI expects .ino file in a directory with same name
+        mkdir -p demir_firmware
+        
+        # Copy source files to sketch directory
+        cp -r src/* demir_firmware/
+        cp -r include/* demir_firmware/
+        
+        # Rename main.cpp to .ino file
+        mv demir_firmware/main.cpp demir_firmware/demir_firmware.ino
+        
+        # List files for debugging
+        echo "Files in sketch directory:"
+        find demir_firmware -type f -name "*.cpp" -o -name "*.h" -o -name "*.ino" | sort
+
+    - name: Compile firmware for Arduino UNO
+      run: |
+        arduino-cli compile \
+          --fqbn arduino:avr:uno \
+          --verbose \
+          --warnings all \
+          --build-path ./build \
+          --output-dir ./output \
+          --build-property "compiler.cpp.extra_flags=-std=c++17" \
+          demir_firmware
+
+    - name: Check build artifacts
+      run: |
+        echo "Build artifacts:"
+        ls -la ./output/ || echo "Output directory not found"
+        ls -la ./build/ || echo "Build directory not found"
+        
+        # Look for hex file
+        find . -name "*.hex" -type f | head -5
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: demir-firmware-${{ matrix.board }}
+        path: |
+          ./output/*.hex
+          ./output/*.elf
+          ./build/*.hex
+          ./build/*.elf
+        retention-days: 30
+
+    - name: Calculate firmware size
+      if: success()
+      run: |
+        echo "=== Firmware Size Report ==="
+        if [ -f "./output/demir_firmware.ino.hex" ]; then
+          HEX_FILE="./output/demir_firmware.ino.hex"
+        elif [ -f "./build/demir_firmware.ino.hex" ]; then
+          HEX_FILE="./build/demir_firmware.ino.hex"
+        else
+          HEX_FILE=$(find . -name "*.hex" -type f | head -1)
+        fi
+        
+        if [ -f "$HEX_FILE" ]; then
+          echo "Hex file: $HEX_FILE"
+          SIZE=$(wc -c < "$HEX_FILE")
+          echo "Hex file size: $SIZE bytes"
+          
+          # Calculate program memory usage (approximate)
+          PROGRAM_SIZE=$(grep -v '^:00000001FF$' "$HEX_FILE" | \
+                        grep '^:' | \
+                        cut -c2-3 | \
+                        paste -sd+ | \
+                        bc 2>/dev/null || echo "0")
+          
+          echo "Estimated program size: $PROGRAM_SIZE bytes"
+          echo "Arduino UNO flash memory: 32768 bytes (32KB)"
+          
+          if [ "$PROGRAM_SIZE" -gt 0 ]; then
+            USAGE_PERCENT=$((PROGRAM_SIZE * 100 / 32768))
+            echo "Memory usage: ${USAGE_PERCENT}%"
+            
+            if [ "$USAGE_PERCENT" -gt 90 ]; then
+              echo "⚠️ WARNING: Memory usage is over 90%!"
+            elif [ "$USAGE_PERCENT" -gt 75 ]; then
+              echo "⚠️ NOTICE: Memory usage is over 75%"
+            else
+              echo "✅ Memory usage is acceptable"
+            fi
+          fi
+        else
+          echo "❌ Hex file not found!"
+        fi
+
+  # Lint and static analysis
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Run cpplint
+      uses: reviewdog/action-cpplint@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: github-pr-review
+        targets: --recursive src include
+        level: warning
+        
+    - name: Check code formatting
+      run: |
+        echo "Checking for common issues..."
+        
+        # Check for TODO/FIXME comments
+        echo "=== TODO/FIXME items ==="
+        grep -rn "TODO\|FIXME" src/ include/ || echo "None found"
+        
+        # Check for potential issues
+        echo "=== Potential issues ==="
+        grep -rn "velPID\[ 4 \]" src/ || echo "No velPID[4] array issues found"
+        echo "Build completed successfully!"
