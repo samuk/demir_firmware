@@ -72,7 +72,6 @@ void COM_command_13();  ///< Command handler 13
 void COM_command_14();  ///< Command handler 14
 void COM_command_15();  ///< Command handler 15
 void COM_command_16();  ///< Command handler 16
-void COM_command_17();  ///< Command handler 17 (duplicate declaration)
 void COM_command_17();  ///< Command handler 17
 void COM_command_18();  ///< Command handler 18
 void COM_command_19();  ///< Command handler 19
