@@ -73,8 +73,6 @@ void loop() {
                     Solver.logForMatlab[Solver.logCounter] = (unsigned long)Motor.getPosition(MOTOR_1);
                     break;
                 case LOG_CURRENT:
-                    // unsigned long tempHex = *(unsigned long*)&totalCurrent;
-                    // Solver.logForMatlab[Solver.logCounter] = tempHex;
                     break;
             }
 
@@ -91,12 +89,11 @@ void loop() {
     // Send logged data to MATLAB if requested
     if (Solver.sendLogToMatlab) {
         Solver.sendLogToMatlab = false;
-
         for (uint16_t j = 0; j < Solver.logSize; j++) {
-            Serial.write(Solver.logForMatlab[j]);        // LSB
-            Serial.write(Solver.logForMatlab[j] >> 8);   // Byte 1
-            Serial.write(Solver.logForMatlab[j] >> 16);  // Byte 2
-            Serial.write(Solver.logForMatlab[j] >> 24);  // MSB
+            Serial.write(Solver.logForMatlab[j]);
+            Serial.write(Solver.logForMatlab[j] >> 8);
+            Serial.write(Solver.logForMatlab[j] >> 16);
+            Serial.write(Solver.logForMatlab[j] >> 24);
         }
     }
 }
