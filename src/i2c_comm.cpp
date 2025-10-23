@@ -1,7 +1,7 @@
 /**
  * @file i2c_comm.cpp
  * @brief I2C communication interface implementation for DEMIR controller
- * @author Muhammet Şükrü Demir
+ * @author Muhammet Şam Rossiter
  * @date 2025
  */
 
