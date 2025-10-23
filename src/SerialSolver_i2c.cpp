@@ -1,7 +1,7 @@
 /**
  * @file SerialSolver_i2c.cpp
  * @brief I2C command handling for DEMIR controller
- * @author Muhammet Şükrü Demir
+ * @author Muhammet Şam Rossiter
  * @date 2025
  */
 
